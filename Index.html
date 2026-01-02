@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>invAIR</title>
+ <link rel="stylesheet" href="style.css" />
+ <link rel="icon" href="data:,">
+
+
+  <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+</head>
+<body>
+<div id="app">
+  <div id="frame"></div>
+  <div id="labels"></div>
+
+  <div id="hudWrap">
+    <div id="hud">
+      <div id="hudHeader">
+        <h1>AIRvin</h1>
+        <button class="hudBtn" id="toggleHud" aria-label="Свернуть/развернуть">—</button>
+      </div>
+
+      <div id="hudBody">
+        <div class="row">
+          <span class="pill">Цвет = AIR (Air to Investment Ratio)</span>
+          <span class="pill">Размер = капитал</span>
+          <span class="pill">% = доля сектора в суммарном капитале</span>
+        </div>
+        <div class="hint">
+          • Режим информации — клик по шару раскрывает/сворачивает список компаний.<br/>
+          • Режим скрытия — клик удаляет сектор.<br/>
+          • “Вернуть сектор” восстанавливает последний убранный сектор.
+        </div>
+        <div class="row rowBtns">
+          <button class="hudBtn" id="toggleCompanies">Сменить режим</button>
+          <button class="hudBtn" id="undoPop">Вернуть сектор</button>
+          <button class="hudBtn" id="toggleTheme">Тема</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+
+
+    <div id="yaxis">
+    <div class="title">Capital share (Y)</div>
+    <div class="scale" id="scale"></div>
+  </div>
+
+  <!-- Панель клинических исследований -->
+  <div id="trialsPanel">
+    <div class="trials-header">
+      <div class="trials-title" id="trialsTitle">Trials</div>
+      <button id="trialsClose" type="button">×</button>
+    </div>
+    <div class="trials-search">
+      <input id="trialsSearch" type="text" placeholder="Поиск по названию, NCT ID или состояниям..." />
+    </div>
+    <div id="trialsStatus"></div>
+    <div id="trialsList"></div>
+  </div>
+
+</div>
+
+<script type="module" src="main.js"></script>
+
+</body>
+</html>

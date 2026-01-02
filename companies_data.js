@@ -1,0 +1,26 @@
+// companies_data.js
+export const COMPANIES_BY_GROUP = {
+  stem_cells: ["BlueRock Therapeutics", "Aspen Neuroscience", "Lineage Cell Therapeutics"],
+  broad_platform: ["Altos Labs", "Calico", "Insilico Medicine", "Recursion Pharmaceuticals", "Gero"],
+  autophagy: ["Denali Therapeutics ROIC -51.87%", "Selphagy"],
+  mitochondria: ["Stealth BioTherapeutics", "Khondrion"],
+  metabolism: ["MetroBiotech", "ChromaDex ROIC +28.08%", "Elysium Health"],
+  microbiome: ["Vedanta Biosciences", "Seres Therapeutics ROIC -78.41%", "Evelo Biosciences"],
+  splicing: ["Biosplice", "Stoke Therapeutics", "Skyhawk Therapeutics"],
+  proteostasis: ["Proteostasis Therapeutics", "Prothena ROIC -93.12%"],
+  umbrella_company: ["Juvenescence", "Life Biosciences", "Cambrian Bio"],
+  epigenetic: ["Rejuvenate Bio", "Turn Biotechnologies", "Zymo Research"],
+  senescence: ["Unity Biotechnology ROIC -14.29%", "Oisin Biotechnologies", "Cleara Biotech"],
+  cell_communication: ["BioAge Labs", "Alkahest"],
+  app: ["InsideTracker", "Human Longevity Inc"],
+  genomic: ["CRISPR Therapeutics ROIC -23.16%", "Editas Medicine ROIC -246.45%", "Beam Therapeutics ROIC -37.53%"],
+  inflammation: ["InflammX", "Nirva Therapeutics"],
+  intracell_junk: ["Ichor Therapeutics", "SENS Research Foundation"],
+  ECM: ["Molecular Matrix", "AgeX Therapeutics"],
+  klotho: ["Klotho Neurosciences"],
+  telomeres: ["Geron ROIC -16.68%", "Telomere Therapeutics"],
+  clocks: ["TruDiagnostic", "Clock Bio"],
+  reprogramming: ["Altos Labs", "Turn Biotechnologies"],
+  CRO: ["Charles River Laboratories", "Evotec"],
+  access_company: ["LabCorp", "Thermo Fisher Scientific"]
+};
