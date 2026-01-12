@@ -7,7 +7,9 @@ let companiesMode = true;
 export function getCompaniesMode() { return companiesMode; }
 export function setCompaniesMode(v) { companiesMode = !!v; }
 
-let hudCollapsed = false;
+const isCoarse = matchMedia("(pointer: coarse)").matches;
+let hudCollapsed = isCoarse;
+
 
 function applyHudState(hud, btnToggleHud) {
   hud.classList.toggle("collapsed", hudCollapsed);

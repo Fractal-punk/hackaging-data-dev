@@ -13,6 +13,7 @@ import { getHoverBubble, setHoverBubble } from "./scene_setup.js";
 
 const raycaster = new THREE.Raycaster();
 const ndc = new THREE.Vector2();
+const isCoarse = matchMedia("(pointer: coarse)").matches;
 
 function setTipVisible(on) {
   airTip.style.display = on ? "block" : "none";
@@ -70,6 +71,13 @@ let panButton = null; // 1 = средняя, 2 = правая, 0 c Alt+лева�
 let middleDownTime = 0;
 let middleMoved = false;
 
+let downX = 0, downY = 0;
+let downTime = 0;
+let moved = false;
+const TAP_MOVE_PX = 10;
+const TAP_TIME_MS = 320;
+
+
 // отключаем контекстное меню, чтобы правая кнопка не мешала
 renderer.domElement.addEventListener("contextmenu", (e) => e.preventDefault());
 
@@ -81,6 +89,7 @@ renderer.domElement.addEventListener("pointerleave", () => {
 
 // hover move
 renderer.domElement.addEventListener("pointermove", (e) => {
+  if (isCoarse) return;
   const rect = renderer.domElement.getBoundingClientRect();
   const x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
   const y = -(((e.clientY - rect.top) / rect.height) * 2 - 1);
@@ -123,6 +132,21 @@ renderer.domElement.addEventListener("pointermove", (e) => {
 
 // pointerdown
 renderer.domElement.addEventListener("pointerdown", (e) => {
+  downX = e.clientX;
+  downY = e.clientY;
+  downTime = performance.now();
+  moved = false;
+
+    // MOBILE: один палец = потенциальный pan, tap решаем на pointerup
+  if (isCoarse) {
+    isPanning = true;
+    panButton = 0; // условно
+    lastPanX = e.clientX;
+    lastPanY = e.clientY;
+    e.preventDefault();
+    return;
+  }
+
   // Панорамирование: правая или средняя кнопка, либо Alt+левая
   if (e.button === 1 || e.button === 2 || e.altKey) {
     isPanning = true;
@@ -166,6 +190,13 @@ renderer.domElement.addEventListener("pointerdown", (e) => {
 // pan move (window-level)
 window.addEventListener("pointermove", (e) => {
   if (!isPanning) return;
+  const ddx = e.clientX - downX;
+const ddy = e.clientY - downY;
+if (!moved) {
+  const dist2 = ddx * ddx + ddy * ddy;
+  if (dist2 > TAP_MOVE_PX * TAP_MOVE_PX) moved = true;
+}
+
 
   const dx = e.clientX - lastPanX;
   const dy = e.clientY - lastPanY;
@@ -201,6 +232,38 @@ window.addEventListener("pointermove", (e) => {
 
 // pointerup
 window.addEventListener("pointerup", (e) => {
+
+    // MOBILE TAP
+  if (isCoarse) {
+    const dt = performance.now() - downTime;
+    if (!moved && dt < TAP_TIME_MS) {
+      // обработать тап как клик по шару
+      const rect = renderer.domElement.getBoundingClientRect();
+      const x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+      const y = -(((e.clientY - rect.top) / rect.height) * 2 - 1);
+
+      ndc.set(x, y);
+      raycaster.setFromCamera(ndc, camera);
+
+      const meshes = bubbles.map(b => b.mesh);
+      const hits = raycaster.intersectObjects(meshes, false);
+      if (hits.length > 0) {
+        const hitMesh = hits[0].object;
+        const b = bubbles.find(bb => bb.mesh === hitMesh);
+        if (b) {
+          if (getCompaniesMode()) {
+            b.inEl.classList.toggle("expanded");
+          } else {
+            popBubble(b);
+          }
+        }
+      }
+    }
+
+    isPanning = false;
+    panButton = null;
+    return;
+  }
   // если отпускали именно среднюю кнопку, проверяем "быстрый клик"
   if (panButton === 1 && e.button === 1) {
     const dt = performance.now() - middleDownTime;

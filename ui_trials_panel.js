@@ -134,6 +134,15 @@ export function openTrialsPanelForGroup(group) {
 if (trialsClose) {
   trialsClose.addEventListener("click", () => closeTrialsPanel());
 }
+// Клик вне панели — закрыть (особенно удобно на мобилках)
+document.addEventListener("pointerdown", (e) => {
+  if (!trialsPanel) return;
+  if (trialsPanel.style.display === "none") return;
+
+  const inside = e.target.closest("#trialsPanel");
+  const isLink = e.target.closest('[data-role="trial-link"]');
+  if (!inside && !isLink) closeTrialsPanel();
+});
 
 // Поиск по trials
 if (trialsSearch) {
