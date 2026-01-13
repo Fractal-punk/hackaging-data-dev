@@ -20,6 +20,14 @@ renderer.setSize(app.clientWidth, app.clientHeight);
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 app.appendChild(renderer.domElement);
+// --- Critical for mobile pinch/zoom via Pointer Events ---
+// гарантируем, что именно canvas НЕ будет отдавать жесты браузеру
+renderer.domElement.style.touchAction = "none";      // важно
+renderer.domElement.style.webkitTouchCallout = "none";
+renderer.domElement.style.userSelect = "none";
+
+// иногда события фактически приходят в контейнер — тоже запрещаем жесты браузера
+if (app) app.style.touchAction = "none";
 
 export const scene = new THREE.Scene();
 
