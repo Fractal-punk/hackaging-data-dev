@@ -15,6 +15,7 @@ const raycaster = new THREE.Raycaster();
 const ndc = new THREE.Vector2();
 const isCoarse = matchMedia("(pointer: coarse)").matches;
 
+
 function setTipVisible(on) {
   airTip.style.display = on ? "block" : "none";
 }
@@ -71,11 +72,34 @@ let panButton = null; // 1 = средняя, 2 = правая, 0 c Alt+лева�
 let middleDownTime = 0;
 let middleMoved = false;
 
+// --- multitouch state (for mobile) ---
+const touchPts = new Map(); // pointerId -> {x,y}
+let pinchActive = false;
+let pinchStartDist = 0;
+let pinchStartZoom = 1;
+
+// tap / double-tap
 let downX = 0, downY = 0;
 let downTime = 0;
 let moved = false;
 const TAP_MOVE_PX = 10;
 const TAP_TIME_MS = 320;
+
+let lastTapTime = 0;
+let lastTapX = 0;
+let lastTapY = 0;
+const DOUBLE_TAP_MS = 320;
+const DOUBLE_TAP_PX = 18;
+
+function dist2(a, b) {
+  const dx = a.x - b.x, dy = a.y - b.y;
+  return dx*dx + dy*dy;
+}
+
+function distance(a, b) {
+  const dx = a.x - b.x, dy = a.y - b.y;
+  return Math.sqrt(dx*dx + dy*dy);
+}
 
 
 // отключаем контекстное меню, чтобы правая кнопка не мешала
@@ -132,29 +156,42 @@ renderer.domElement.addEventListener("pointermove", (e) => {
 
 // pointerdown
 renderer.domElement.addEventListener("pointerdown", (e) => {
+  // общие параметры тапа
   downX = e.clientX;
   downY = e.clientY;
   downTime = performance.now();
   moved = false;
 
-    // MOBILE: один палец = потенциальный pan, tap решаем на pointerup
-  if (isCoarse) {
-    isPanning = true;
-    panButton = 0; // условно
-    lastPanX = e.clientX;
-    lastPanY = e.clientY;
+  // MOBILE: используем pointer events для 1-finger pan + pinch
+  if (isCoarse && e.pointerType === "touch") {
+    renderer.domElement.setPointerCapture?.(e.pointerId);
+    touchPts.set(e.pointerId, { x: e.clientX, y: e.clientY });
+
+    // если стало 2 пальца — начинаем pinch
+    if (touchPts.size === 2) {
+      const pts = Array.from(touchPts.values());
+      pinchActive = true;
+      pinchStartDist = distance(pts[0], pts[1]);
+      pinchStartZoom = view.zoom;
+    } else {
+      // 1 палец = панорамирование
+      isPanning = true;
+      panButton = 0;
+      lastPanX = e.clientX;
+      lastPanY = e.clientY;
+    }
+
     e.preventDefault();
     return;
   }
 
-  // Панорамирование: правая или средняя кнопка, либо Alt+левая
+  // DESKTOP: твоя старая логика панорамирования мышью
   if (e.button === 1 || e.button === 2 || e.altKey) {
     isPanning = true;
     panButton = e.button === 1 ? 1 : (e.button === 2 ? 2 : 0);
     lastPanX = e.clientX;
     lastPanY = e.clientY;
 
-    // если это именно средняя кнопка — начинаем отслеживать "быстрый клик"
     if (panButton === 1) {
       middleDownTime = performance.now();
       middleMoved = false;
@@ -164,7 +201,7 @@ renderer.domElement.addEventListener("pointerdown", (e) => {
     return;
   }
 
-  // Обычный клик по шару (левая кнопка без Alt)
+  // DESKTOP: обычный клик по шару (ЛКМ)
   const rect = renderer.domElement.getBoundingClientRect();
   const x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
   const y = -(((e.clientY - rect.top) / rect.height) * 2 - 1);
@@ -187,29 +224,75 @@ renderer.domElement.addEventListener("pointerdown", (e) => {
   }
 });
 
+
 // pan move (window-level)
 window.addEventListener("pointermove", (e) => {
-  if (!isPanning) return;
-  const ddx = e.clientX - downX;
-const ddy = e.clientY - downY;
-if (!moved) {
-  const dist2 = ddx * ddx + ddy * ddy;
-  if (dist2 > TAP_MOVE_PX * TAP_MOVE_PX) moved = true;
-}
+  // MOBILE multitouch
+  if (isCoarse && e.pointerType === "touch") {
+    if (!touchPts.has(e.pointerId)) return;
 
+    const prev = touchPts.get(e.pointerId);
+    const next = { x: e.clientX, y: e.clientY };
+    touchPts.set(e.pointerId, next);
+
+    // отметим "moved"
+    if (!moved) {
+      const dx = e.clientX - downX;
+      const dy = e.clientY - downY;
+      if (dx*dx + dy*dy > TAP_MOVE_PX*TAP_MOVE_PX) moved = true;
+    }
+
+    // pinch
+    if (touchPts.size === 2) {
+      const pts = Array.from(touchPts.values());
+      const d = distance(pts[0], pts[1]);
+      if (pinchActive && pinchStartDist > 0) {
+        const k = d / pinchStartDist;
+        view.zoom = clamp(pinchStartZoom * k, 0.5, 3.5);
+        updateCameraFrustum();
+      }
+      e.preventDefault();
+      return;
+    }
+
+    // one-finger pan
+    if (isPanning) {
+      const dx = next.x - prev.x;
+      const dy = next.y - prev.y;
+
+      const w = app.clientWidth || 1;
+      const h = app.clientHeight || 1;
+      const aspect = w / h;
+
+      const baseH = 12;
+      const viewH = baseH / view.zoom;
+      const viewW = viewH * aspect;
+
+      const worldDX = -dx / w * viewW;
+      const worldDY =  dy / h * viewH;
+
+      view.cx += worldDX;
+      view.cy += worldDY;
+
+      updateCameraFrustum();
+      e.preventDefault();
+    }
+    return;
+  }
+
+  // DESKTOP pan
+  if (!isPanning) return;
 
   const dx = e.clientX - lastPanX;
   const dy = e.clientY - lastPanY;
   lastPanX = e.clientX;
   lastPanY = e.clientY;
 
-  // если это средняя кнопка — отслеживаем, был ли заметный сдвиг
   if (panButton === 1 && !middleMoved) {
-    const dist2 = dx * dx + dy * dy;
-    if (dist2 > 4 * 4) middleMoved = true;
+    const dist2m = dx * dx + dy * dy;
+    if (dist2m > 4 * 4) middleMoved = true;
   }
 
-  // панорамирование выполняем всегда, кроме случая "клик без движения"
   if (panButton === 1 && !middleMoved) return;
 
   const w = app.clientWidth || 1;
@@ -220,7 +303,6 @@ if (!moved) {
   const viewH = baseH / view.zoom;
   const viewW = viewH * aspect;
 
-  // dx,dy (пиксели) -> смещение в координатах сцены
   const worldDX = -dx / w * viewW;
   const worldDY =  dy / h * viewH;
 
@@ -230,14 +312,22 @@ if (!moved) {
   updateCameraFrustum();
 });
 
+
 // pointerup
 window.addEventListener("pointerup", (e) => {
 
-    // MOBILE TAP
-  if (isCoarse) {
+
+    // MOBILE end
+  if (isCoarse && e.pointerType === "touch") {
+    // убираем pointer из карты
+    touchPts.delete(e.pointerId);
+
+    // если осталось меньше 2 — pinch стоп
+    if (touchPts.size < 2) pinchActive = false;
+
+    // если это был тап (не двигали)
     const dt = performance.now() - downTime;
     if (!moved && dt < TAP_TIME_MS) {
-      // обработать тап как клик по шару
       const rect = renderer.domElement.getBoundingClientRect();
       const x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
       const y = -(((e.clientY - rect.top) / rect.height) * 2 - 1);
@@ -247,23 +337,42 @@ window.addEventListener("pointerup", (e) => {
 
       const meshes = bubbles.map(b => b.mesh);
       const hits = raycaster.intersectObjects(meshes, false);
-      if (hits.length > 0) {
+
+      // double-tap по пустому месту = resetView()
+      const now = performance.now();
+      const dxTap = e.clientX - lastTapX;
+      const dyTap = e.clientY - lastTapY;
+      const closePos = (dxTap*dxTap + dyTap*dyTap) < (DOUBLE_TAP_PX*DOUBLE_TAP_PX);
+      const isDouble = (now - lastTapTime) < DOUBLE_TAP_MS && closePos;
+
+      if (hits.length === 0) {
+        if (isDouble) resetView();
+        lastTapTime = now;
+        lastTapX = e.clientX;
+        lastTapY = e.clientY;
+
+      } else {
+        // есть попадание — обычное действие
         const hitMesh = hits[0].object;
         const b = bubbles.find(bb => bb.mesh === hitMesh);
         if (b) {
-          if (getCompaniesMode()) {
-            b.inEl.classList.toggle("expanded");
-          } else {
-            popBubble(b);
-          }
+          if (getCompaniesMode()) b.inEl.classList.toggle("expanded");
+          else popBubble(b);
         }
+
+        // для double-tap не считаем "на пузыре"
+        lastTapTime = now;
+        lastTapX = e.clientX;
+        lastTapY = e.clientY;
       }
     }
 
+    // сброс pan
     isPanning = false;
     panButton = null;
     return;
   }
+  
   // если отпускали именно среднюю кнопку, проверяем "быстрый клик"
   if (panButton === 1 && e.button === 1) {
     const dt = performance.now() - middleDownTime;

@@ -206,10 +206,18 @@
     .hudBtn:hover { background: rgba(255,255,255,0.12); }
 
     #hudBody {
-      transition: opacity 200ms ease, transform 200ms ease;
-      opacity: 1;
-      transform: translateY(0);
+    transition: opacity 200ms ease, transform 200ms ease;
+    opacity: 1;
+    transform: translateY(0);
+
+    /* скролл появляется только при переполнении */
+    overflow: auto;
+
+    /* ограничение по высоте — работает и на ПК, и на мобилке */
+    max-height: min(320px, calc((var(--vh, 1vh) * 100) - 130px));
+    padding-right: 6px; /* чтобы скролл не наезжал на текст */
     }
+
 
     #hud .row { display: flex; gap: 10px; align-items: center; margin: 8px 0; flex-wrap: wrap; }
     #hud .hint { font-size: 12px; opacity: 0.86; line-height: 1.35; }
@@ -228,13 +236,15 @@
     }
 
 
-    #hud.collapsed { max-height: 56px; }
     #hud.collapsed #hudBody {
-      opacity: 0;
-      transform: translateY(-6px);
-      pointer-events: none;
-      height: 0;
+    opacity: 0;
+    transform: translateY(-6px);
+    pointer-events: none;
+    height: 0;
+    max-height: 0;
+    overflow: hidden;
     }
+
 
     /* ---------- Y axis ---------- */
     #yaxis {

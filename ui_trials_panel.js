@@ -158,16 +158,32 @@ if (labelsRoot) {
   labelsRoot.addEventListener("click", (e) => {
     // 1) Клик по кнопке Trials — открываем панель и выходим
     const link = e.target.closest('[data-role="trial-link"]');
-    if (link) {
-      e.stopPropagation();
-      e.preventDefault();
+if (link) {
+  e.stopPropagation();
+  e.preventDefault();
 
-      const group = link.dataset.group;
-      if (!group) return;
+  // Требование: Trials открываем только если карточка уже раскрыта.
+  // Первый тап по Trials на закрытой карточке = просто раскрыть карточку.
+  const card = link.closest(".inball");
+  if (card && !card.classList.contains("expanded")) {
+    const b = bubbles.find(bb => bb.inEl === card);
+    if (!b) return;
 
-      openTrialsPanelForGroup(group);
-      return;
+    if (getCompaniesMode()) {
+      card.classList.add("expanded");
+    } else {
+      popBubble(b);
     }
+    return;
+  }
+
+  const group = link.dataset.group;
+  if (!group) return;
+
+  openTrialsPanelForGroup(group);
+  return;
+}
+
 
     // 2) Любой клик по карточке сектора (.inball) — либо toggle, либо pop
     const card = e.target.closest(".inball");
