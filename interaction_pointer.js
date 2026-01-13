@@ -236,24 +236,21 @@ renderer.domElement.addEventListener("pointerdown", (e) => {
     // 2 пальца => pinch
     if (touchPts.size === 2) {
       const pts = Array.from(touchPts.values());
+
       pinchActive = true;
       pinchStartDist = distance(pts[0], pts[1]);
       pinchStartZoom = view.zoom;
 
-      // 1 палец => потенциальный pan (но стартуем только после порога движения)
-      pinchActive = false;
-      touchPanEnabled = true;
+      // во время pinch НИКАКОГО pan
+      touchPanEnabled = false;
       touchPanStarted = false;
-
-      isPanning = false;     // <-- ВАЖНО: не пан сразу
-      panButton = 0;
-      lastPanX = e.clientX;
-      lastPanY = e.clientY;
-
+      isPanning = false;
+      panButton = null;
 
       e.preventDefault();
       return;
     }
+
 
     // 1 палец => потенциальный pan (но стартуем только после порога движения)
     pinchActive = false;
@@ -466,18 +463,7 @@ window.addEventListener("pointerup", (e) => {
     downOnUI = false;
   }
 
-    window.addEventListener("pointercancel", (e) => {
-    if (e.pointerType === "touch") {
-      touchPts.delete(e.pointerId);
-      if (touchPts.size < 2) pinchActive = false;
-    }
-    isPanning = false;
-    panButton = null;
-    touchPanEnabled = false;
-    touchPanStarted = false;
-  }, { passive: true });
-
-
+  
 
   // DESKTOP middle fast click => reset
   if (panButton === 1 && e.button === 1) {
@@ -490,6 +476,17 @@ window.addEventListener("pointerup", (e) => {
   panButton = null;
   middleMoved = false;
 }, { passive: false });
+
+window.addEventListener("pointercancel", (e) => {
+  if (e.pointerType === "touch") {
+    touchPts.delete(e.pointerId);
+    if (touchPts.size < 2) pinchActive = false;
+  }
+  isPanning = false;
+  panButton = null;
+  touchPanEnabled = false;
+  touchPanStarted = false;
+}, { passive: true });
 
 window.addEventListener("pointerleave", () => {
   isPanning = false;
