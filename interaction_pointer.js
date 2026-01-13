@@ -7,14 +7,12 @@ import { airValueByGroup } from "./heatmap.js";
 import { projectToScreen } from "./projection_overlay.js";
 import { clamp } from "./utils.js";
 import { view, updateCameraFrustum, resetView } from "./camera_view.js";
-import { getCompaniesMode } from "./hud_controls.js"; // <-- ВАЖНО: имя файла!
-import { getHoverBubble, setHoverBubble } from "./scene_setup.js";
-
+import { getCompaniesMode } from "./hud_controls.js";
+import { setHoverBubble } from "./scene_setup.js";
 
 const raycaster = new THREE.Raycaster();
 const ndc = new THREE.Vector2();
 const isCoarse = matchMedia("(pointer: coarse)").matches;
-
 
 function setTipVisible(on) {
   airTip.style.display = on ? "block" : "none";
@@ -78,6 +76,10 @@ let pinchActive = false;
 let pinchStartDist = 0;
 let pinchStartZoom = 1;
 
+// 1-finger pan state
+let touchPanEnabled = false;
+let touchPanStarted = false;
+
 // tap / double-tap
 let downX = 0, downY = 0;
 let downTime = 0;
@@ -91,51 +93,118 @@ let lastTapY = 0;
 const DOUBLE_TAP_MS = 320;
 const DOUBLE_TAP_PX = 18;
 
-function dist2(a, b) {
-  const dx = a.x - b.x, dy = a.y - b.y;
-  return dx*dx + dy*dy;
-}
+// desktop click candidate
+let downBubble = null;
+let downButton = 0;
+let downOnUI = false;
+
 
 function distance(a, b) {
   const dx = a.x - b.x, dy = a.y - b.y;
   return Math.sqrt(dx*dx + dy*dy);
 }
 
+function isUIAtPoint(clientX, clientY) {
+  const el = document.elementFromPoint(clientX, clientY);
+  if (!el) return false;
 
-// отключаем контекстное меню, чтобы правая кнопка не мешала
-renderer.domElement.addEventListener("contextmenu", (e) => e.preventDefault());
+  // HUD и trials panel — всегда UI
+  if (el.closest("#hudWrap") || el.closest("#trialsPanel")) return true;
 
-// hover off
-renderer.domElement.addEventListener("pointerleave", () => {
- // hoverBubble = null;
-  setTipVisible(false);
-});
+  // Внутри карточки UI только "окно", а не заголовки/текст
+  // (окном считаем companies и кнопку trials)
+  if (el.closest(".companies") || el.closest(".trialLink") || el.closest('[data-role="trial-link"]')) return true;
 
-// hover move
-renderer.domElement.addEventListener("pointermove", (e) => {
-  if (isCoarse) return;
+  // Ссылки тоже UI
+  if (el.closest("a")) return true;
+
+  return false;
+}
+
+
+function baseHWorld() {
+  return 12; // важно: должно совпадать с тем, что используешь в camera/frustum и pan-логике
+}
+
+function worldToPixelsScale(rect) {
+  // px per 1 world unit по вертикали
+  return (rect.height * view.zoom) / baseHWorld();
+}
+
+// Более точный hit-test по экранному радиусу шара
+function pickBubbleByScreenDistance(clientX, clientY) {
   const rect = renderer.domElement.getBoundingClientRect();
-  const x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
-  const y = -(((e.clientY - rect.top) / rect.height) * 2 - 1);
+  const pxPerWorld = worldToPixelsScale(rect);
+
+  let best = null;
+  let bestD2 = Infinity;
+
+  for (const b of bubbles) {
+    const p = projectToScreen(b.mesh.position.x, b.mesh.position.y, b.mesh.position.z);
+
+    const cx = rect.left + p.x;
+    const cy = rect.top  + p.y;
+
+    const dx = clientX - cx;
+    const dy = clientY - cy;
+
+    // радиус в пикселях (слегка увеличим для удобства пальцем/мышью)
+    const rPx = b.targetR * pxPerWorld * 1.12;
+    const r2 = rPx * rPx;
+
+    const d2 = dx*dx + dy*dy;
+    if (d2 <= r2 && d2 < bestD2) {
+      best = b;
+      bestD2 = d2;
+    }
+  }
+  return best;
+}
+
+function raycastPick(clientX, clientY) {
+  const rect = renderer.domElement.getBoundingClientRect();
+  const x = ((clientX - rect.left) / rect.width) * 2 - 1;
+  const y = -(((clientY - rect.top) / rect.height) * 2 - 1);
 
   ndc.set(x, y);
   raycaster.setFromCamera(ndc, camera);
 
   const meshes = bubbles.map(b => b.mesh);
   const hits = raycaster.intersectObjects(meshes, false);
-
-  if (hits.length === 0) {
-  setHoverBubble(null);
-  setTipVisible(false);
-  return;
-  }
+  if (hits.length === 0) return null;
 
   const hitMesh = hits[0].object;
-  const b = bubbles.find(bb => bb.mesh === hitMesh);
-  if (!b) {
+  return bubbles.find(bb => bb.mesh === hitMesh) || null;
+}
+
+// отключаем контекстное меню
+renderer.domElement.addEventListener("contextmenu", (e) => e.preventDefault());
+
+// hover off
+renderer.domElement.addEventListener("pointerleave", () => {
   setHoverBubble(null);
   setTipVisible(false);
-  return;
+});
+
+// hover move (desktop only)
+renderer.domElement.addEventListener("pointermove", (e) => {
+  if (isCoarse) return;
+  if (isUIAtPoint(e.clientX, e.clientY)) {
+    setHoverBubble(null);
+    setTipVisible(false);
+    return;
+  }
+
+  // 1) raycast
+  let b = raycastPick(e.clientX, e.clientY);
+
+  // 2) fallback screen-radius (чтобы попадало на краях круга)
+  if (!b) b = pickBubbleByScreenDistance(e.clientX, e.clientY);
+
+  if (!b) {
+    setHoverBubble(null);
+    setTipVisible(false);
+    return;
   }
 
   setHoverBubble(b);
@@ -143,49 +212,64 @@ renderer.domElement.addEventListener("pointermove", (e) => {
   const air = airValueByGroup(b.s.group);
   const airClamped = clamp((air ?? 0), -1, 1);
 
-  // позиция: над кругом
   const g = b.mesh;
   const p = projectToScreen(g.position.x, g.position.y, g.position.z);
 
   airTip.textContent = `AIR = ${airClamped.toFixed(2)}`;
   airTip.style.left = `${p.x}px`;
   airTip.style.top  = `${p.y}px`;
-
   setTipVisible(true);
 });
 
 // pointerdown
 renderer.domElement.addEventListener("pointerdown", (e) => {
-  // общие параметры тапа
   downX = e.clientX;
   downY = e.clientY;
   downTime = performance.now();
   moved = false;
 
-  // MOBILE: используем pointer events для 1-finger pan + pinch
+  // MOBILE (touch)
   if (isCoarse && e.pointerType === "touch") {
     renderer.domElement.setPointerCapture?.(e.pointerId);
     touchPts.set(e.pointerId, { x: e.clientX, y: e.clientY });
 
-    // если стало 2 пальца — начинаем pinch
+    // 2 пальца => pinch
     if (touchPts.size === 2) {
       const pts = Array.from(touchPts.values());
       pinchActive = true;
       pinchStartDist = distance(pts[0], pts[1]);
       pinchStartZoom = view.zoom;
-    } else {
-      // 1 палец = панорамирование
-      isPanning = true;
+
+      // 1 палец => потенциальный pan (но стартуем только после порога движения)
+      pinchActive = false;
+      touchPanEnabled = true;
+      touchPanStarted = false;
+
+      isPanning = false;     // <-- ВАЖНО: не пан сразу
       panButton = 0;
       lastPanX = e.clientX;
       lastPanY = e.clientY;
+
+
+      e.preventDefault();
+      return;
     }
+
+    // 1 палец => потенциальный pan (но стартуем только после порога движения)
+    pinchActive = false;
+    touchPanEnabled = true;
+    touchPanStarted = false;
+
+    isPanning = true;
+    panButton = 0;
+    lastPanX = e.clientX;
+    lastPanY = e.clientY;
 
     e.preventDefault();
     return;
   }
 
-  // DESKTOP: твоя старая логика панорамирования мышью
+  // DESKTOP pan (middle/right/alt+left)
   if (e.button === 1 || e.button === 2 || e.altKey) {
     isPanning = true;
     panButton = e.button === 1 ? 1 : (e.button === 2 ? 2 : 0);
@@ -201,29 +285,26 @@ renderer.domElement.addEventListener("pointerdown", (e) => {
     return;
   }
 
-  // DESKTOP: обычный клик по шару (ЛКМ)
-  const rect = renderer.domElement.getBoundingClientRect();
-  const x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
-  const y = -(((e.clientY - rect.top) / rect.height) * 2 - 1);
+  // DESKTOP click candidate (left)
+  if (e.button === 0) {
+    downOnUI = isUIAtPoint(e.clientX, e.clientY);
+    if (downOnUI) {
+      downBubble = null;
+      return;
+    }
 
-  ndc.set(x, y);
-  raycaster.setFromCamera(ndc, camera);
+    let b = raycastPick(e.clientX, e.clientY);
+    if (!b) b = pickBubbleByScreenDistance(e.clientX, e.clientY);
+    if (!b) {
+      downBubble = null;
+      return;
+    }
 
-  const meshes = bubbles.map(b => b.mesh);
-  const hits = raycaster.intersectObjects(meshes, false);
-  if (hits.length === 0) return;
-
-  const hitMesh = hits[0].object;
-  const b = bubbles.find(bb => bb.mesh === hitMesh);
-  if (!b) return;
-
-  if (getCompaniesMode()) {
-    b.inEl.classList.toggle("expanded");
-  } else {
-    popBubble(b);
+    downBubble = b;
+    downButton = 0;
   }
-});
 
+});
 
 // pan move (window-level)
 window.addEventListener("pointermove", (e) => {
@@ -235,11 +316,11 @@ window.addEventListener("pointermove", (e) => {
     const next = { x: e.clientX, y: e.clientY };
     touchPts.set(e.pointerId, next);
 
-    // отметим "moved"
+    // moved threshold
     if (!moved) {
-      const dx = e.clientX - downX;
-      const dy = e.clientY - downY;
-      if (dx*dx + dy*dy > TAP_MOVE_PX*TAP_MOVE_PX) moved = true;
+      const dx0 = e.clientX - downX;
+      const dy0 = e.clientY - downY;
+      if (dx0*dx0 + dy0*dy0 > TAP_MOVE_PX*TAP_MOVE_PX) moved = true;
     }
 
     // pinch
@@ -255,8 +336,20 @@ window.addEventListener("pointermove", (e) => {
       return;
     }
 
-    // one-finger pan
-    if (isPanning) {
+    // 1-finger pan
+    if (isPanning && touchPanEnabled) {
+      // стартуем пан только после порога (иначе любой тап станет паном)
+      if (!touchPanStarted) {
+        const dx0 = e.clientX - downX;
+        const dy0 = e.clientY - downY;
+        if (dx0*dx0 + dy0*dy0 > TAP_MOVE_PX*TAP_MOVE_PX) {
+          touchPanStarted = true;
+          isPanning = true;
+        } else {
+          return; // ещё считаем тапом
+        }
+      }
+
       const dx = next.x - prev.x;
       const dy = next.y - prev.y;
 
@@ -264,7 +357,7 @@ window.addEventListener("pointermove", (e) => {
       const h = app.clientHeight || 1;
       const aspect = w / h;
 
-      const baseH = 12;
+      const baseH = baseHWorld();
       const viewH = baseH / view.zoom;
       const viewW = viewH * aspect;
 
@@ -299,7 +392,7 @@ window.addEventListener("pointermove", (e) => {
   const h = app.clientHeight || 1;
   const aspect = w / h;
 
-  const baseH = 12;
+  const baseH = baseHWorld();
   const viewH = baseH / view.zoom;
   const viewW = viewH * aspect;
 
@@ -312,65 +405,73 @@ window.addEventListener("pointermove", (e) => {
   updateCameraFrustum();
 });
 
-
 // pointerup
 window.addEventListener("pointerup", (e) => {
-
-
-    // MOBILE end
+  // MOBILE end
   if (isCoarse && e.pointerType === "touch") {
-    // убираем pointer из карты
     touchPts.delete(e.pointerId);
 
-    // если осталось меньше 2 — pinch стоп
     if (touchPts.size < 2) pinchActive = false;
 
-    // если это был тап (не двигали)
-    // если это был тап (не двигали)
-const dt = performance.now() - downTime;
-if (!moved && dt < TAP_TIME_MS) {
+    const dt = performance.now() - downTime;
 
-  // Если тапнули по UI (HUD / trials) — ничего не делаем
-  const el = document.elementFromPoint(e.clientX, e.clientY);
-  if (el && (el.closest("#hudWrap") || el.closest("#trialsPanel"))) {
-    // ничего
-  } else {
-    // double-tap по пустому месту = resetView()
-    const now = performance.now();
-    const dxTap = e.clientX - lastTapX;
-    const dyTap = e.clientY - lastTapY;
-    const closePos = (dxTap*dxTap + dyTap*dyTap) < (DOUBLE_TAP_PX*DOUBLE_TAP_PX);
-    const isDouble = (now - lastTapTime) < DOUBLE_TAP_MS && closePos;
+    // если это был TAP (не двигали / не панорамировали)
+    if (!moved && dt < TAP_TIME_MS) {
+      // если тап по UI — не обрабатываем сцену
+      if (!isUIAtPoint(e.clientX, e.clientY)) {
+        const now = performance.now();
+        const dxTap = e.clientX - lastTapX;
+        const dyTap = e.clientY - lastTapY;
+        const closePos = (dxTap*dxTap + dyTap*dyTap) < (DOUBLE_TAP_PX*DOUBLE_TAP_PX);
+        const isDouble = (now - lastTapTime) < DOUBLE_TAP_MS && closePos;
 
-    // Если тап по карточке сектора (.inball) — НЕ обрабатываем здесь.
-    // Это сделает labelsRoot click-handler (ui_trials_panel.js).
-    const card = el ? el.closest(".inball") : null;
+        // bubble pick: raycast или screen-radius
+        let b = raycastPick(e.clientX, e.clientY);
+        if (!b) b = pickBubbleByScreenDistance(e.clientX, e.clientY);
 
-    if (!card) {
-      if (isDouble) resetView();
+        if (!b) {
+          // тап по фону
+          if (isDouble) resetView();
+        } else {
+          // тап по шару
+          if (getCompaniesMode()) b.inEl.classList.toggle("expanded");
+          else popBubble(b);
+        }
+
+        lastTapTime = now;
+        lastTapX = e.clientX;
+        lastTapY = e.clientY;
+      }
     }
 
-    lastTapTime = now;
-    lastTapX = e.clientX;
-    lastTapY = e.clientY;
-  }
-}
-
-
-    // сброс pan
+    // reset pan states
     isPanning = false;
     panButton = null;
+    touchPanEnabled = false;
+    touchPanStarted = false;
     return;
   }
-  
-  // если отпускали именно среднюю кнопку, проверяем "быстрый клик"
-  if (panButton === 1 && e.button === 1) {
-    const dt = performance.now() - middleDownTime;
-    const isFast = dt < 250;
 
-    if (!middleMoved && isFast) {
-      resetView();
+    // DESKTOP: apply click on pointerup (only if not panning)
+  if (!isCoarse && (e.button === 0 || e.button === undefined)) {
+    if (!isPanning && downBubble && !downOnUI) {
+      // если отпустили над UI — не считаем кликом по сцене
+      if (!isUIAtPoint(e.clientX, e.clientY)) {
+        if (getCompaniesMode()) downBubble.inEl.classList.toggle("expanded");
+        else popBubble(downBubble);
+      }
     }
+
+    downBubble = null;
+    downOnUI = false;
+  }
+
+
+  // DESKTOP middle fast click => reset
+  if (panButton === 1 && e.button === 1) {
+    const dtm = performance.now() - middleDownTime;
+    const isFast = dtm < 250;
+    if (!middleMoved && isFast) resetView();
   }
 
   isPanning = false;
@@ -382,4 +483,6 @@ window.addEventListener("pointerleave", () => {
   isPanning = false;
   panButton = null;
   middleMoved = false;
+  touchPanEnabled = false;
+  touchPanStarted = false;
 });

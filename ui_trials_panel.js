@@ -4,13 +4,6 @@ import { ensureTrialsLoaded, getTrialsDataByGroup, isTrialsLoaded } from "./tria
 import { labelsRoot } from "./scene_setup.js";
 import { bubbles } from "./bubbles_factory.js";
 
-import { popBubble } from "./interaction_pointer.js";
-import { getCompaniesMode } from "./hud_controls.js";
-
-
-
-
-
 // Trials panel elements
 const trialsPanel  = document.getElementById("trialsPanel");
 const trialsTitle  = document.getElementById("trialsTitle");
@@ -119,7 +112,6 @@ export function openTrialsPanelForGroup(group) {
 
       renderTrialsListForGroup(group, "");
 
-      // лёгкий фокус на поиск
       setTimeout(() => {
         try { trialsSearch?.focus(); } catch (e) {}
       }, 10);
@@ -130,21 +122,16 @@ export function openTrialsPanelForGroup(group) {
     });
 }
 
-// Кнопка закрытия панели
+// Закрытие trials panel — ТОЛЬКО по X
 if (trialsClose) {
-  trialsClose.addEventListener("click", () => closeTrialsPanel());
+  trialsClose.addEventListener("click", (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    closeTrialsPanel();
+  });
 }
-// Клик вне панели — закрыть (особенно удобно на мобилках)
-document.addEventListener("pointerdown", (e) => {
-  if (!trialsPanel) return;
-  if (trialsPanel.style.display === "none") return;
 
-  const inside = e.target.closest("#trialsPanel");
-  const isLink = e.target.closest('[data-role="trial-link"]');
-  if (!inside && !isLink) closeTrialsPanel();
-});
-
-// Поиск по trials
+// Поиск
 if (trialsSearch) {
   trialsSearch.addEventListener("input", () => {
     const group = trialsPanel?.dataset.group;
@@ -153,57 +140,88 @@ if (trialsSearch) {
   });
 }
 
-// Клики внутри overlay (цифры, названия, Trials и т.п.)
-function onOverlayActivate(e) {
-  // Для мыши: пропускаем не-левую кнопку
-  if (e.pointerType !== "touch") {
-    if (e.button !== undefined && e.button !== 0) return;
-  }
+/**
+ * Overlay interaction rules:
+ * - Header (cap/ret/name/meta) is NOT interactive via CSS pointer-events:none
+ * - Companies window (.companies) toggles expanded on click/tap
+ * - Trials button (.trialLink[data-role="trial-link"]) opens trials panel
+ */
+function handleOverlayAction(clientX, clientY) {
+  const el = document.elementFromPoint(clientX, clientY);
+  if (!el) return;
 
-  // 1) Trials link
-  const link = e.target.closest('[data-role="trial-link"]');
+  // Не вмешиваемся, если клик был по HUD или trialsPanel
+  if (el.closest("#hudWrap") || el.closest("#trialsPanel")) return;
+
+  // 1) Trials button
+  const link = el.closest('[data-role="trial-link"]');
   if (link) {
-    e.stopPropagation();
-    e.preventDefault();
-
+    // гасим событие, чтобы не улетало в canvas
+    // (само событие гасим в listener-ах ниже)
     const card = link.closest(".inball");
-    if (card && !card.classList.contains("expanded")) {
-      card.classList.add("expanded");
+    if (!card) return;
+
+    if (!card.classList.contains("expanded")) {
+      card.classList.add("expanded"); // первый клик только раскрывает
       return;
     }
 
     const group = link.dataset.group;
     if (!group) return;
-
     openTrialsPanelForGroup(group);
     return;
   }
 
-  // 2) Card tap/click
-  const card = e.target.closest(".inball");
-  if (!card) return;
+  // 2) Companies window toggles expanded
+  const companiesBox = el.closest(".companies");
+  if (companiesBox) {
+    const card = companiesBox.closest(".inball");
+    if (!card) return;
 
-  // если клик по ссылке внутри — не трогаем
-  if (e.target.closest("a")) return;
+    // Если клик по ссылке внутри компаний — не закрываем карточку
+    if (el.closest("a")) return;
 
-  const b = bubbles.find(bb => bb.inEl === card);
-  if (!b) return;
-
-  if (getCompaniesMode()) {
     card.classList.toggle("expanded");
-  } else {
-    popBubble(b);
+    return;
   }
+
+  // Всё остальное игнорируем (заголовок не интерактивен)
 }
+
+const coarse = matchMedia("(pointer: coarse)").matches;
 
 if (labelsRoot) {
-  const isCoarse = matchMedia("(pointer: coarse)").matches;
+  if (coarse) {
+    labelsRoot.addEventListener("pointerup", (e) => {
+      if (e.pointerType !== "touch") return;
 
-  if (isCoarse) {
-    labelsRoot.addEventListener("pointerup", onOverlayActivate, { passive: false });
+      // Если было по интерактиву — гасим, чтобы не пошло в canvas
+      const el = document.elementFromPoint(e.clientX, e.clientY);
+      if (!el) return;
+      const isOverlayInteractive =
+        el.closest('[data-role="trial-link"]') || el.closest(".companies");
+
+      if (!isOverlayInteractive) return;
+
+      e.preventDefault();
+      e.stopPropagation();
+
+      handleOverlayAction(e.clientX, e.clientY);
+    }, { passive: false });
   } else {
-    labelsRoot.addEventListener("click", onOverlayActivate);
+    labelsRoot.addEventListener("click", (e) => {
+      const t = e.target;
+
+      // Обрабатываем только интерактивные элементы overlay
+      const isOverlayInteractive =
+        t.closest('[data-role="trial-link"]') || t.closest(".companies");
+
+      if (!isOverlayInteractive) return;
+
+      e.preventDefault();
+      e.stopPropagation();
+
+      handleOverlayAction(e.clientX, e.clientY);
+    });
   }
 }
-
-
