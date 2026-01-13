@@ -561,6 +561,9 @@
     /* ---------- MOBILE / COARSE POINTER ---------- */
 @media (pointer: coarse), (max-width: 820px) {
   #frame { inset: 10px; border-radius: 14px; }
+    #app { touch-action: none; }
+  #labels { touch-action: none; }
+  canvas { touch-action: none; }
 
   /* HUD — компактнее и ближе к краям */
   #hudWrap{
@@ -617,6 +620,8 @@
       right: max(10px, env(safe-area-inset-right));
       bottom: max(10px, env(safe-area-inset-bottom));
     }
+    html, body { overscroll-behavior: none; }
+    #app { overscroll-behavior: none; }
   }
 }
 
