@@ -178,13 +178,13 @@ function raycastPick(clientX, clientY) {
 }
 
 // отключаем контекстное меню
-renderer.domElement.addEventListener("contextmenu", (e) => e.preventDefault());
+renderer.domElement.addEventListener("contextmenu", (e) => e.preventDefault(), { passive: false });
 
 // hover off
 renderer.domElement.addEventListener("pointerleave", () => {
   setHoverBubble(null);
   setTipVisible(false);
-});
+}, { passive: true });
 
 // hover move (desktop only)
 renderer.domElement.addEventListener("pointermove", (e) => {
@@ -219,7 +219,7 @@ renderer.domElement.addEventListener("pointermove", (e) => {
   airTip.style.left = `${p.x}px`;
   airTip.style.top  = `${p.y}px`;
   setTipVisible(true);
-});
+}, { passive: false });
 
 // pointerdown
 renderer.domElement.addEventListener("pointerdown", (e) => {
@@ -304,7 +304,7 @@ renderer.domElement.addEventListener("pointerdown", (e) => {
     downButton = 0;
   }
 
-});
+}, { passive: false });
 
 // pan move (window-level)
 window.addEventListener("pointermove", (e) => {
@@ -403,7 +403,7 @@ window.addEventListener("pointermove", (e) => {
   view.cy += worldDY;
 
   updateCameraFrustum();
-});
+}, { passive: false });
 
 // pointerup
 window.addEventListener("pointerup", (e) => {
@@ -466,6 +466,18 @@ window.addEventListener("pointerup", (e) => {
     downOnUI = false;
   }
 
+    window.addEventListener("pointercancel", (e) => {
+    if (e.pointerType === "touch") {
+      touchPts.delete(e.pointerId);
+      if (touchPts.size < 2) pinchActive = false;
+    }
+    isPanning = false;
+    panButton = null;
+    touchPanEnabled = false;
+    touchPanStarted = false;
+  }, { passive: true });
+
+
 
   // DESKTOP middle fast click => reset
   if (panButton === 1 && e.button === 1) {
@@ -477,7 +489,7 @@ window.addEventListener("pointerup", (e) => {
   isPanning = false;
   panButton = null;
   middleMoved = false;
-});
+}, { passive: false });
 
 window.addEventListener("pointerleave", () => {
   isPanning = false;
@@ -485,4 +497,4 @@ window.addEventListener("pointerleave", () => {
   middleMoved = false;
   touchPanEnabled = false;
   touchPanStarted = false;
-});
+}, { passive: true });
