@@ -154,41 +154,56 @@ if (trialsSearch) {
 }
 
 // Клики внутри overlay (цифры, названия, Trials и т.п.)
-if (labelsRoot) {
-  labelsRoot.addEventListener("click", (e) => {
-    // 1) Клик по кнопке Trials — открываем панель и выходим
-    const link = e.target.closest('[data-role="trial-link"]');
-if (link) {
-  e.stopPropagation();
-  e.preventDefault();
+function onOverlayActivate(e) {
+  // Для мыши: пропускаем не-левую кнопку
+  if (e.pointerType !== "touch") {
+    if (e.button !== undefined && e.button !== 0) return;
+  }
 
-  const card = link.closest(".inball");
-  if (card && !card.classList.contains("expanded")) {
-    // первый тап по trials на закрытой карточке = просто раскрыть
-    card.classList.add("expanded");
+  // 1) Trials link
+  const link = e.target.closest('[data-role="trial-link"]');
+  if (link) {
+    e.stopPropagation();
+    e.preventDefault();
+
+    const card = link.closest(".inball");
+    if (card && !card.classList.contains("expanded")) {
+      card.classList.add("expanded");
+      return;
+    }
+
+    const group = link.dataset.group;
+    if (!group) return;
+
+    openTrialsPanelForGroup(group);
     return;
   }
 
-  const group = link.dataset.group;
-  if (!group) return;
+  // 2) Card tap/click
+  const card = e.target.closest(".inball");
+  if (!card) return;
 
-  openTrialsPanelForGroup(group);
-  return;
+  // если клик по ссылке внутри — не трогаем
+  if (e.target.closest("a")) return;
+
+  const b = bubbles.find(bb => bb.inEl === card);
+  if (!b) return;
+
+  if (getCompaniesMode()) {
+    card.classList.toggle("expanded");
+  } else {
+    popBubble(b);
+  }
+}
+
+if (labelsRoot) {
+  const isCoarse = matchMedia("(pointer: coarse)").matches;
+
+  if (isCoarse) {
+    labelsRoot.addEventListener("pointerup", onOverlayActivate, { passive: false });
+  } else {
+    labelsRoot.addEventListener("click", onOverlayActivate);
+  }
 }
 
 
-
-    // 2) Любой клик по карточке сектора (.inball) — либо toggle, либо pop
-    const card = e.target.closest(".inball");
-    if (!card) return;
-
-    const b = bubbles.find(bb => bb.inEl === card);
-    if (!b) return;
-
-    if (getCompaniesMode()) {
-      card.classList.toggle("expanded");
-    } else {
-      popBubble(b);
-    }
-  });
-}
