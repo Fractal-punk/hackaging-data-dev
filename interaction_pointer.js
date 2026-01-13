@@ -326,46 +326,36 @@ window.addEventListener("pointerup", (e) => {
     if (touchPts.size < 2) pinchActive = false;
 
     // если это был тап (не двигали)
-    const dt = performance.now() - downTime;
-    if (!moved && dt < TAP_TIME_MS) {
-      const rect = renderer.domElement.getBoundingClientRect();
-      const x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
-      const y = -(((e.clientY - rect.top) / rect.height) * 2 - 1);
+    // если это был тап (не двигали)
+const dt = performance.now() - downTime;
+if (!moved && dt < TAP_TIME_MS) {
 
-      ndc.set(x, y);
-      raycaster.setFromCamera(ndc, camera);
+  // Если тапнули по UI (HUD / trials) — ничего не делаем
+  const el = document.elementFromPoint(e.clientX, e.clientY);
+  if (el && (el.closest("#hudWrap") || el.closest("#trialsPanel"))) {
+    // ничего
+  } else {
+    // double-tap по пустому месту = resetView()
+    const now = performance.now();
+    const dxTap = e.clientX - lastTapX;
+    const dyTap = e.clientY - lastTapY;
+    const closePos = (dxTap*dxTap + dyTap*dyTap) < (DOUBLE_TAP_PX*DOUBLE_TAP_PX);
+    const isDouble = (now - lastTapTime) < DOUBLE_TAP_MS && closePos;
 
-      const meshes = bubbles.map(b => b.mesh);
-      const hits = raycaster.intersectObjects(meshes, false);
+    // Если тап по карточке сектора (.inball) — НЕ обрабатываем здесь.
+    // Это сделает labelsRoot click-handler (ui_trials_panel.js).
+    const card = el ? el.closest(".inball") : null;
 
-      // double-tap по пустому месту = resetView()
-      const now = performance.now();
-      const dxTap = e.clientX - lastTapX;
-      const dyTap = e.clientY - lastTapY;
-      const closePos = (dxTap*dxTap + dyTap*dyTap) < (DOUBLE_TAP_PX*DOUBLE_TAP_PX);
-      const isDouble = (now - lastTapTime) < DOUBLE_TAP_MS && closePos;
-
-      if (hits.length === 0) {
-        if (isDouble) resetView();
-        lastTapTime = now;
-        lastTapX = e.clientX;
-        lastTapY = e.clientY;
-
-      } else {
-        // есть попадание — обычное действие
-        const hitMesh = hits[0].object;
-        const b = bubbles.find(bb => bb.mesh === hitMesh);
-        if (b) {
-          if (getCompaniesMode()) b.inEl.classList.toggle("expanded");
-          else popBubble(b);
-        }
-
-        // для double-tap не считаем "на пузыре"
-        lastTapTime = now;
-        lastTapX = e.clientX;
-        lastTapY = e.clientY;
-      }
+    if (!card) {
+      if (isDouble) resetView();
     }
+
+    lastTapTime = now;
+    lastTapX = e.clientX;
+    lastTapY = e.clientY;
+  }
+}
+
 
     // сброс pan
     isPanning = false;

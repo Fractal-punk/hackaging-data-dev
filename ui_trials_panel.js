@@ -162,18 +162,10 @@ if (link) {
   e.stopPropagation();
   e.preventDefault();
 
-  // Требование: Trials открываем только если карточка уже раскрыта.
-  // Первый тап по Trials на закрытой карточке = просто раскрыть карточку.
   const card = link.closest(".inball");
   if (card && !card.classList.contains("expanded")) {
-    const b = bubbles.find(bb => bb.inEl === card);
-    if (!b) return;
-
-    if (getCompaniesMode()) {
-      card.classList.add("expanded");
-    } else {
-      popBubble(b);
-    }
+    // первый тап по trials на закрытой карточке = просто раскрыть
+    card.classList.add("expanded");
     return;
   }
 
@@ -183,6 +175,7 @@ if (link) {
   openTrialsPanelForGroup(group);
   return;
 }
+
 
 
     // 2) Любой клик по карточке сектора (.inball) — либо toggle, либо pop
