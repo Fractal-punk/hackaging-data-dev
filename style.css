@@ -98,8 +98,14 @@
     }
 
     .inball.expanded {
-      pointer-events: auto;
+      pointer-events: none;
      }
+     .inball.expanded .companies,
+      .inball.expanded .trialLink,
+      .inball.expanded [data-role="trial-link"],
+      .inball.expanded a {
+        pointer-events: auto;
+      }
 
     .inball:not(.expanded) .trialLink {
       pointer-events: none;
