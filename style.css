@@ -2,7 +2,14 @@
   height: 100%;
   margin: 0;
   overflow: hidden;
-  background: #0b0f16;
+  }
+
+  body{
+  background:
+    radial-gradient(1200px 600px at 20% 35%, rgba(60,130,255,0.14), transparent 60%),
+    radial-gradient(900px 500px at 70% 60%, rgba(130,255,180,0.10), transparent 60%),
+    linear-gradient(180deg, rgba(255,255,255,0.03), rgba(0,0,0,0.15)),
+    #0b0f16;
   }
 
   /* реальная высота экрана на мобилках */
@@ -23,19 +30,14 @@
   }
 
 
-    #frame {
+    #frame{
       position: absolute; inset: 18px;
       border-radius: 16px;
       border: 1px solid rgba(255,255,255,0.10);
       box-shadow: 0 16px 60px rgba(0,0,0,0.45);
       pointer-events: none;
       z-index: 0;
-      background:
-        radial-gradient(1200px 600px at 20% 35%,
-          rgba(60,130,255,0.14), transparent 60%),
-        radial-gradient(900px 500px at 70% 60%,
-          rgba(130,255,180,0.10), transparent 60%),
-        linear-gradient(180deg, rgba(255,255,255,0.03), rgba(0,0,0,0.15));
+      background: transparent; /* <-- ключ */
     }
         /* ---------- AIR tooltip ---------- */
     #airTip{
@@ -49,7 +51,7 @@
     font-size: 12px;
     font-weight: 900;
     letter-spacing: 0.2px;
-    color: rgba(255,255,255,0.96);
+    color: rgba(255, 255, 255, 0.96);
     background: rgba(0,0,0,0.55);
     border: 1px solid rgba(255,255,255,0.14);
     box-shadow: 0 10px 24px rgba(0,0,0,0.35);
@@ -58,13 +60,15 @@
     white-space: nowrap;
     }
 
-    body.strict #airTip{
-    color: rgba(0,0,0,0.92);
-    background: rgba(255,255,255,0.96);
-    border: 1px solid rgba(0,0,0,0.14);
-    box-shadow: none;
-    backdrop-filter: none;
+    body.strict{
+      background: #848484 !important;
     }
+
+    body.strict #frame{
+      border: 1px solid rgba(0,0,0,0.10);
+      box-shadow: none;
+    }
+
 
 
     #labels {
@@ -327,7 +331,7 @@
     }
 
     body.strict #trialsPanel{
-      background: rgba(255,255,255,0.98);
+      background: rgba(255, 255, 255, 0.98);
       border-color: rgba(0,0,0,0.16);
       box-shadow: 0 18px 40px rgba(0,0,0,0.10);
       color: rgba(0,0,0,0.92);
@@ -506,13 +510,17 @@
 
         /* ---------- THEME: strict ---------- */
     body.strict {
-    background: #ffffff !important;
+    background: #e1e1e1 !important;
     }
 
     body.strict #frame{
     border: 1px solid rgba(0,0,0,0.10);
     box-shadow: none;
-    background: #ffffff;
+    background: #e1e1e1;
+    
+    background-attachment: fixed;      /* фиксируем к viewport */
+    background-repeat: no-repeat;
+    background-size: cover;    
     }
 
     body.strict canvas { cursor: crosshair; }

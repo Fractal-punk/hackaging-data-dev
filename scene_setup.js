@@ -51,25 +51,4 @@ const rimLight = new THREE.DirectionalLight(0xffffff, 0.55);
 rimLight.position.set(18, 8, 22);
 scene.add(rimLight);
 
-export const wall = new THREE.Mesh(
-  new THREE.PlaneGeometry(60, 34),
-  new THREE.MeshStandardMaterial({ color: 0x0b1020, roughness: 1.0, metalness: 0.0 })
-);
-wall.position.set(0, 0, -8);
-wall.receiveShadow = true;
-scene.add(wall);
 
-export const floor = new THREE.Mesh(
-  new THREE.PlaneGeometry(60, 34),
-  new THREE.MeshStandardMaterial({
-    color: 0x070a10,
-    roughness: 1.0,
-    metalness: 0.0,
-    transparent: true,
-    opacity: 0.35
-  })
-);
-floor.rotation.x = Math.PI / 2;
-floor.position.set(0, -7.2, 0);
-floor.receiveShadow = true;
-scene.add(floor);

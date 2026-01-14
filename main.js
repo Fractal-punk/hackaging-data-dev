@@ -1,8 +1,7 @@
 import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js";
 
 import {
-  app, labelsRoot, airTip, renderer, scene, camera, wall, floor,
-  getHoverBubble, setHoverBubble
+  app, labelsRoot, airTip, renderer, scene, camera, getHoverBubble, setHoverBubble
 } from "./scene_setup.js";
 
 import { view, updateCameraFrustum, resetView } from "./camera_view.js";

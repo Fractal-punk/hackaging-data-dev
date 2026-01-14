@@ -3,18 +3,25 @@ import { buildYTicks } from "./y_axis_scale.js";
 
 // -------- Панорама и зум --------
 export const view = {
-  zoom: 1.0,   // масштаб (1 = как раньше)
-  cx: 0,       // центр по X
-  cy: 0        // центр по Y
+  zoom: 1.0,
+  cx: 0,
+  cy: 0
 };
+
+// размеры геометрий (должны совпадать с тем, что ты создаёшь в scene_setup.js)
+const WALL_W = 60;
+const WALL_H = 34;
+
+// “запас” чтобы края не появлялись при пан/зуме
+const BG_PAD = 1.35;
 
 export function updateCameraFrustum() {
   const w = app.clientWidth || 1;
   const h = app.clientHeight || 1;
   const aspect = w / h;
 
-  const baseH = 12;                 // базовая высота сцены
-  const viewH = baseH / view.zoom;  // учитываем зум
+  const baseH = 12;
+  const viewH = baseH / view.zoom;
   const viewW = viewH * aspect;
 
   camera.left   = view.cx - viewW / 2;
@@ -23,10 +30,8 @@ export function updateCameraFrustum() {
   camera.bottom = view.cy - viewH / 2;
   camera.updateProjectionMatrix();
 
-  // камера смотрит на центр текущего view
   camera.position.set(view.cx, view.cy, 60);
 
-  // и сразу пересчёт шкалы под новый фрустум
   buildYTicks();
 }
 
