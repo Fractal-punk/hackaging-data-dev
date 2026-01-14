@@ -12,6 +12,23 @@ const trialsSearch = document.getElementById("trialsSearch");
 const trialsStatus = document.getElementById("trialsStatus");
 const trialsClose  = document.getElementById("trialsClose");
 
+// --- Ghost-tap guard (mobile) ---
+let panelArmed = true; // можно ли взаимодействовать с панелью прямо сейчас
+
+function disarmPanelBriefly(ms = 120) {
+  if (!trialsPanel) return;
+
+  panelArmed = false;
+  trialsPanel.style.pointerEvents = "none";
+
+  // включаем обратно после микропаузЫ
+  window.setTimeout(() => {
+    panelArmed = true;
+    trialsPanel.style.pointerEvents = "auto";
+  }, ms);
+}
+
+
 export function closeTrialsPanel() {
   if (!trialsPanel) return;
   trialsPanel.style.display = "none";
@@ -98,6 +115,9 @@ export function openTrialsPanelForGroup(group) {
   if (trialsStatus) trialsStatus.textContent = "Загружаем данные о клинических исследованиях...";
   if (trialsList) trialsList.innerHTML = "";
   trialsPanel.style.display = "flex";
+  // Важно: чтобы "тот же самый" pointerup не нажал по панели сразу после появления
+  disarmPanelBriefly(140);
+
 
   ensureTrialsLoaded()
     .then(() => {
@@ -130,6 +150,24 @@ if (trialsClose) {
     closeTrialsPanel();
   });
 }
+
+// Если панель только что появилась — гасим любые pointer/click события внутри неё
+if (trialsPanel) {
+  const swallowIfDisarmed = (e) => {
+    if (!panelArmed) {
+      e.preventDefault();
+      e.stopPropagation();
+      e.stopImmediatePropagation?.();
+      return false;
+    }
+  };
+
+  // На мобилке чаще всего прилетает pointerup/click
+  trialsPanel.addEventListener("pointerdown", swallowIfDisarmed, { passive: false });
+  trialsPanel.addEventListener("pointerup", swallowIfDisarmed, { passive: false });
+  trialsPanel.addEventListener("click", swallowIfDisarmed, { passive: false });
+}
+
 
 // Поиск
 if (trialsSearch) {
