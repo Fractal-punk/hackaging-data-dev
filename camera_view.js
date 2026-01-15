@@ -29,6 +29,7 @@ export function updateCameraFrustum() {
   camera.top    = view.cy + viewH / 2;
   camera.bottom = view.cy - viewH / 2;
   camera.updateProjectionMatrix();
+  updateInballScale();
 
   camera.position.set(view.cx, view.cy, 60);
 
@@ -40,4 +41,17 @@ export function resetView() {
   view.cx = 0;
   view.cy = 0;
   updateCameraFrustum();
+}
+
+function updateInballScale() {
+  // масштабируем только на мобилке
+  if (!matchMedia("(pointer: coarse)").matches) return;
+
+  // ограничим масштаб, чтобы не уехало
+  const k = Math.min(1.6, Math.max(0.85, view.zoom));
+
+  document.documentElement.style.setProperty(
+    "--inball-scale",
+    k.toFixed(3)
+  );
 }
